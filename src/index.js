@@ -281,6 +281,9 @@ export default {
 
     const path = url.pathname.replace(/\/+$/, ""); // strip trailing slash ("/" -> "")
 
+    // No favicon to serve; answer 204 so browsers stop asking (no 404 noise).
+    if (path === "/favicon.ico") return new Response(null, { status: 204 });
+
     try {
       let res;
       if (path === "") res = handleHome(url);
