@@ -60,9 +60,10 @@ wrangler secret put FA_KEY       # Faceit Analyser API key (only needed for /max
 wrangler deploy
 ```
 
-Local development uses [`.dev.vars`](https://developers.cloudflare.com/workers/configuration/secrets/#local-development-with-secrets) for secrets (git-ignored):
+For local development, copy the secrets template and fill it in. [`.dev.vars`](https://developers.cloudflare.com/workers/configuration/secrets/#local-development-with-secrets) is git-ignored:
 
 ```sh
+cp .dev.vars.example .dev.vars   # then edit the values
 npm run dev
 ```
 
@@ -74,7 +75,7 @@ Endpoints return JSON, so parse it with `$(urlfetch json ...)` + `$(eval)`. Repl
 Nightbot:
 ```
 !addcom !elo $(eval const a = $(urlfetch json https://<your-worker>.workers.dev/elo?query=$(querystring)&default=<nickname>&h=12); a.error ? a.error : a.nickname + ' • ELO: ' + a.elo + ' • LVL: ' + a.level + ' • ' + a.window.hours + 'h: ' + a.window.eloStr + ' [' + a.window.win + 'W/' + a.window.lose + 'L]')
-!addcom !maxelo $(eval const a = $(urlfetch json https://<your-worker>.workers.dev/maxelo?query=$(querystring)&default=<nickname>); a.error ? a.error : 'Peak ELO: ' + a.maxelo)
+!addcom !maxelo $(eval const a = $(urlfetch json https://<your-worker>.workers.dev/maxelo?query=$(querystring)&default=<nickname>); a.error ? a.error : a.nickname + ' • Peak ELO: ' + a.maxelo)
 ```
 
 Argument-less calls (`!elo`) resolve to `<nickname>`; `!elo someplayer` looks up that player instead.
@@ -83,6 +84,10 @@ Argument-less calls (`!elo`) resolve to `<nickname>`; `!elo someplayer` looks up
 
 - The `/elo` rolling-window stats (`window.*`) come from an **undocumented** FACEIT endpoint. If it breaks, elo/level still return and the window degrades to zeros (`window.hours` becomes `0`).
 - `/maxelo` depends on [Faceit Analyser](https://faceitanalyser.com/) (`highest_elo` field). History may be incomplete for rarely-tracked players, and the free tier is limited to ~5000 requests/month.
+
+## Author
+
+redins1de — [twitch.tv/redins1de](https://www.twitch.tv/redins1de) · [t.me/redinside](https://t.me/redinside)
 
 ## License
 

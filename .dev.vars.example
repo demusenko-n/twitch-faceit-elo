@@ -1,0 +1,4 @@
+# Local dev secrets for `wrangler dev`. Copy to `.dev.vars` and fill in.
+# `.dev.vars` is git-ignored; this template is safe to commit.
+FACEIT_KEY=your-faceit-data-api-key
+FA_KEY=your-faceit-analyser-api-key
