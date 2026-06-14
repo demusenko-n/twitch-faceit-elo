@@ -87,8 +87,9 @@ async function handleElo(url, env, err) {
   const nick = resolveNick(url);
   if (!nick) return err("No nickname provided and no default set");
 
-  // clamp first so h=0 / h=-5 -> 1, not the default
-  const hours = Math.min(168, Math.max(1, Number(url.searchParams.get("h")) || DEFAULT_HOURS));
+  // explicit h clamps to [1,168] (h=0 / h=-5 -> 1); missing/blank -> default
+  const hRaw = url.searchParams.get("h");
+  const hours = hRaw ? Math.min(168, Math.max(1, Number(hRaw) || 1)) : DEFAULT_HOURS;
   const game = (url.searchParams.get("game") || "cs2").trim().toLowerCase() || "cs2";
 
   const { player: p, error } = await lookupPlayer(nick, env, err);
@@ -273,15 +274,23 @@ export default {
     const path = url.pathname.replace(/\/+$/, ""); // strip trailing slash ("/" -> "")
 
     try {
-      if (path === "") return handleHome(url);
-      if (path === "/elo") return handleElo(url, env, err);
-      if (path === "/maxelo") return handlePeak(url, env);
-      if (path === "/playerid") return handlePlayerId(url, env, err);
-      return Response.json({ error: "Not found. See / for usage." }, { status: 404 });
+      let res;
+      if (path === "") res = handleHome(url);
+      else if (path === "/elo") res = await handleElo(url, env, err);
+      else if (path === "/maxelo") res = await handlePeak(url, env);
+      else if (path === "/playerid") res = await handlePlayerId(url, env, err);
+      else res = Response.json({ error: "Not found. See / for usage." }, { status: 404 });
+
+      // Allow browser-side use (StreamElements widgets, OBS browser source, overlays).
+      res.headers.set("Access-Control-Allow-Origin", "*");
+      return res;
     } catch (e) {
       // Keep the "always JSON" contract even on unexpected failures
       // (upstream network error, malformed response, etc.).
-      return Response.json({ error: `Internal error: ${e.message}` }, { status: 500 });
+      return Response.json(
+        { error: `Internal error: ${e.message}` },
+        { status: 500, headers: { "Access-Control-Allow-Origin": "*" } }
+      );
     }
   }
 };
