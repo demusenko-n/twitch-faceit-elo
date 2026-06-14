@@ -84,7 +84,7 @@ Argument-less calls (`!elo`) resolve to `<nickname>`; `!elo someplayer` looks up
 
 - The `/elo` rolling-window stats (`window.*`) come from an **undocumented** FACEIT endpoint. If it breaks, elo/level still return and the window degrades to zeros (`window.hours` becomes `0`).
 - `/maxelo` depends on [Faceit Analyser](https://faceitanalyser.com/) (`highest_elo` field). History may be incomplete for rarely-tracked players, and the free tier is limited to ~5000 requests/month.
-- Successful responses are edge-cached (`/elo` 60s, `/maxelo` 300s, `/playerid` 24h) to spare the upstream APIs. The cache is per-datacenter and errors are never cached, so data can lag by up to the route's TTL.
+- Successful responses are edge-cached (`/elo` 30s, `/maxelo` 600s, `/playerid` 24h) to spare the upstream APIs. The cache is per-datacenter and errors are never cached, so data can lag by up to the route's TTL.
 
 ## Author
 

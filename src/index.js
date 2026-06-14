@@ -64,7 +64,7 @@ const DEFAULT_HOURS = 12;
 
 // Edge-cache TTL per route (seconds). Spares the upstream APIs / rate limits.
 // Cache is per-colo; errors are never cached (they set Cache-Control: no-store).
-const CACHE_TTL = { "/elo": 60, "/maxelo": 300, "/playerid": 86400 };
+const CACHE_TTL = { "/elo": 30, "/maxelo": 600, "/playerid": 86400 };
 
 // FACEIT player_id is a UUID; nicknames never match this shape.
 const PLAYER_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -147,18 +147,16 @@ async function handleElo(url, env, err) {
 // Takes query/default like /elo (nickname or player_id). JSON: { maxelo } or
 // { error }. Faceit Analyser keys on nickname, so a player_id is resolved to a
 // nickname via the Data API first.
-async function handlePeak(url, env) {
-  const jErr = (message) => Response.json({ error: message }, { headers: { "Cache-Control": "no-store" } });
-
+async function handlePeak(url, env, err) {
   let nick = resolveNick(url);
-  if (!nick) return jErr("No nickname provided and no default set");
-  if (!env.FA_KEY) return jErr("Peak lookup not configured (missing FA_KEY)");
+  if (!nick) return err("No nickname provided and no default set");
+  if (!env.FA_KEY) return err("Peak lookup not configured (missing FA_KEY)");
 
   const game = (url.searchParams.get("game") || "cs2").trim().toLowerCase() || "cs2";
 
   // Faceit Analyser needs a nickname; turn a player_id into one first.
   if (isPlayerId(nick)) {
-    const { player, error } = await lookupPlayer(nick, env, jErr);
+    const { player, error } = await lookupPlayer(nick, env, err);
     if (error) return error;
     nick = player.nickname;
   }
@@ -167,13 +165,13 @@ async function handlePeak(url, env) {
     `https://faceitanalyser.com/api/stats/${encodeURIComponent(nick)}/${encodeURIComponent(game)}?key=${env.FA_KEY}`,
     { headers: { "User-Agent": "Mozilla/5.0" } }
   );
-  if (sr.status === 401) return jErr("Faceit Analyser: invalid API key");
-  if (sr.status === 404) return jErr(`Player "${nick}" not found`);
-  if (!sr.ok) return jErr(`Faceit Analyser error: ${sr.status}`);
+  if (sr.status === 401) return err("Faceit Analyser: invalid API key");
+  if (sr.status === 404) return err(`Player "${nick}" not found`);
+  if (!sr.ok) return err(`Faceit Analyser error: ${sr.status}`);
 
   const s = await sr.json();          // global segment object (flat)
   const maxelo = Number(s.highest_elo);
-  if (!maxelo) return jErr(`${nick}: no peak elo data`);
+  if (!maxelo) return err(`${nick}: no peak elo data`);
 
   return Response.json({ nickname: nick, maxelo });
 }
@@ -303,7 +301,7 @@ export default {
       let res;
       if (path === "") res = handleHome(url);
       else if (path === "/elo") res = await handleElo(url, env, err);
-      else if (path === "/maxelo") res = await handlePeak(url, env);
+      else if (path === "/maxelo") res = await handlePeak(url, env, err);
       else if (path === "/playerid") res = await handlePlayerId(url, env, err);
       else res = Response.json({ error: "Not found. See / for usage." }, { status: 404 });
 
