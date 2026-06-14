@@ -1,0 +1,14 @@
+{
+  "name": "faceit-elo-bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "author": "redins1de (https://www.twitch.tv/redins1de)",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4"
+  }
+}

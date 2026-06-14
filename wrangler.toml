@@ -1,0 +1,17 @@
+name = "faceit-elo-bot"
+main = "src/index.js"
+compatibility_date = "2026-06-01"
+
+# Custom domain. The zone (redins1de.xyz) must be active in this Cloudflare
+# account; `wrangler deploy` then creates the DNS record + TLS cert.
+routes = [
+  { pattern = "faceit.redins1de.xyz", custom_domain = true }
+]
+
+# Workers logs / metrics (viewable in the Cloudflare dashboard).
+[observability]
+enabled = true
+
+# Secrets (set via `wrangler secret put`, NOT here):
+#   FACEIT_KEY  - FACEIT Data API key
+#   FA_KEY      - Faceit Analyser API key (for /maxelo)
