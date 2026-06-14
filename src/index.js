@@ -294,7 +294,12 @@ export default {
     const cache = caches.default;
     if (ttl) {
       const hit = await cache.match(request);
-      if (hit) return hit;
+      if (hit) {
+        // Cached responses have immutable headers; re-wrap to tag the hit.
+        const tagged = new Response(hit.body, hit);
+        tagged.headers.set("X-Cache", "HIT");
+        return tagged;
+      }
     }
 
     try {
@@ -311,7 +316,8 @@ export default {
       // Cache successful data responses; errors opt out via Cache-Control: no-store.
       if (ttl && res.headers.get("Cache-Control") !== "no-store") {
         res.headers.set("Cache-Control", `public, max-age=${ttl}`);
-        ctx.waitUntil(cache.put(request, res.clone()));
+        ctx.waitUntil(cache.put(request, res.clone())); // store before tagging so the copy stays clean
+        res.headers.set("X-Cache", "MISS");
       }
       return res;
     } catch (e) {
