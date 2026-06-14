@@ -77,6 +77,30 @@ function resolveNick(url) {
   return (tokens.length === 1 ? tokens[0] : fallback) || null;
 }
 
+// Param normalization shared by handlers and the cache key, so the canonical
+// key matches the values handlers actually use.
+// explicit h clamps to [1,168] (h=0 / h=-5 -> 1); missing/blank -> default.
+function parseHours(url) {
+  const hRaw = url.searchParams.get("h");
+  return hRaw ? Math.min(168, Math.max(1, Number(hRaw) || 1)) : DEFAULT_HOURS;
+}
+function parseGame(url) {
+  return (url.searchParams.get("game") || "cs2").trim().toLowerCase() || "cs2";
+}
+
+// Canonical cache key: collapse query/default into one token, apply the same
+// h/game normalization, sort params. So `?query=a&h=30` and `?h=30&default=a`
+// (when both resolve to `a`) hit the same cache entry. Used for match AND put.
+function cacheKey(url, path) {
+  const p = new URLSearchParams();
+  const nick = resolveNick(url);
+  if (nick) p.set("n", nick);                 // nick is case-sensitive: not lowercased
+  if (path === "/elo") p.set("h", String(parseHours(url)));
+  if (path === "/elo" || path === "/maxelo") p.set("game", parseGame(url));
+  p.sort();
+  return new Request(`${url.origin}${path}?${p}`);
+}
+
 // Look up a player by nickname OR player_id via the official Data API.
 // Returns { player } on success, or { error: Response } to short-circuit.
 async function lookupPlayer(id, env, err) {
@@ -94,10 +118,8 @@ async function handleElo(url, env, err) {
   const nick = resolveNick(url);
   if (!nick) return err("No nickname provided and no default set");
 
-  // explicit h clamps to [1,168] (h=0 / h=-5 -> 1); missing/blank -> default
-  const hRaw = url.searchParams.get("h");
-  const hours = hRaw ? Math.min(168, Math.max(1, Number(hRaw) || 1)) : DEFAULT_HOURS;
-  const game = (url.searchParams.get("game") || "cs2").trim().toLowerCase() || "cs2";
+  const hours = parseHours(url);
+  const game = parseGame(url);
 
   const { player: p, error } = await lookupPlayer(nick, env, err);
   if (error) return error;
@@ -152,7 +174,7 @@ async function handlePeak(url, env, err) {
   if (!nick) return err("No nickname provided and no default set");
   if (!env.FA_KEY) return err("Peak lookup not configured (missing FA_KEY)");
 
-  const game = (url.searchParams.get("game") || "cs2").trim().toLowerCase() || "cs2";
+  const game = parseGame(url);
 
   // Faceit Analyser needs a nickname; turn a player_id into one first.
   if (isPlayerId(nick)) {
@@ -295,10 +317,12 @@ export default {
     if (path === "/favicon.ico") return new Response(null, { status: 204 });
 
     // Serve a fresh copy from the edge cache when we have one.
+    // Look up by a canonical key, not the raw request, so equivalent requests share an entry.
     const ttl = CACHE_TTL[path];
     const cache = caches.default;
-    if (ttl) {
-      const hit = await cache.match(request);
+    const key = ttl ? cacheKey(url, path) : null;
+    if (key) {
+      const hit = await cache.match(key);
       if (hit) {
         // Cached responses have immutable headers; re-wrap to tag the hit.
         const tagged = new Response(hit.body, hit);
@@ -319,9 +343,9 @@ export default {
       res.headers.set("Access-Control-Allow-Origin", "*");
 
       // Cache successful data responses; errors opt out via Cache-Control: no-store.
-      if (ttl && res.headers.get("Cache-Control") !== "no-store") {
+      if (key && res.headers.get("Cache-Control") !== "no-store") {
         res.headers.set("Cache-Control", `public, max-age=${ttl}`);
-        ctx.waitUntil(cache.put(request, res.clone())); // store before tagging so the copy stays clean
+        ctx.waitUntil(cache.put(key, res.clone())); // store before tagging so the copy stays clean
         res.headers.set("X-Cache", "MISS");
       }
       return res;
