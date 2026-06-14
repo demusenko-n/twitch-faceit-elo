@@ -258,6 +258,11 @@ Bare <code>!elo</code> shows your stats; <code>!elo someone</code> looks up anot
 <pre><code>!addcom !elo $(eval const a = $(urlfetch json ${b}/elo?query=$(querystring)&amp;default=YOUR_NICK&amp;h=12); a.error ? a.error : a.nickname + ' • ELO: ' + a.elo + ' • LVL: ' + a.level + ' • ' + a.window.hours + 'h: ' + a.window.eloStr + ' [' + a.window.win + 'W/' + a.window.lose + 'L]')</code></pre>
 <pre><code>!addcom !maxelo $(eval const a = $(urlfetch json ${b}/maxelo?query=$(querystring)&amp;default=YOUR_NICK); a.error ? a.error : a.nickname + ' • Peak ELO: ' + a.maxelo)</code></pre>
 
+<h2>Caching</h2>
+<p>Successful responses are cached at the edge to spare the upstream APIs:
+<code>/elo</code> 30s <span class="sep">·</span> <code>/maxelo</code> 1h <span class="sep">·</span> <code>/playerid</code> 24h.
+Errors are never cached. The <code>X-Cache</code> response header shows <code>HIT</code> or <code>MISS</code>.</p>
+
 <footer>
   Made by <strong>redins1de</strong>
   <span class="sep">·</span>
