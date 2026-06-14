@@ -64,7 +64,7 @@ const DEFAULT_HOURS = 12;
 
 // Edge-cache TTL per route (seconds). Spares the upstream APIs / rate limits.
 // Cache is per-colo; errors are never cached (they set Cache-Control: no-store).
-const CACHE_TTL = { "/elo": 30, "/maxelo": 3600, "/playerid": 86400 };
+const CACHE_TTL = { "/elo": 30, "/maxelo": 3600, "/playerid": 600 };
 
 // FACEIT player_id is a UUID; nicknames never match this shape.
 const PLAYER_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -288,7 +288,7 @@ Bare <code>!elo</code> shows your stats; <code>!elo someone</code> looks up anot
 
 <h2>Caching</h2>
 <p>Successful responses are cached at the edge to spare the upstream APIs:
-<code>/elo</code> 30s <span class="sep">·</span> <code>/maxelo</code> 1h <span class="sep">·</span> <code>/playerid</code> 24h.
+<code>/elo</code> 30s <span class="sep">·</span> <code>/maxelo</code> 1h <span class="sep">·</span> <code>/playerid</code> 10m.
 Errors are never cached. The <code>X-Cache</code> response header shows <code>HIT</code> or <code>MISS</code>.</p>
 
 <footer>
