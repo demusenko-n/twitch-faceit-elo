@@ -75,9 +75,11 @@ const isPlayerId = (s) => PLAYER_ID_RE.test(s);
 // duplicate messages to bypass its anti-spam filter, which would otherwise be
 // treated as a (bogus) nickname on a repeated `!elo`.
 function resolveNick(url) {
+  // Strip invisible chars; also drop a leading "@" (chat mentions like @nick).
   const clean = (s) => (s || "").replace(/\p{Default_Ignorable_Code_Point}/gu, "").trim();
-  const tokens = clean(url.searchParams.get("query")).split(/\s+/).filter(Boolean);
-  const fallback = clean(url.searchParams.get("default"));
+  const deAt = (s) => s.replace(/^@+/, "");
+  const tokens = clean(url.searchParams.get("query")).split(/\s+/).map(deAt).filter(Boolean);
+  const fallback = deAt(clean(url.searchParams.get("default")));
   return (tokens.length === 1 ? tokens[0] : fallback) || null;
 }
 
