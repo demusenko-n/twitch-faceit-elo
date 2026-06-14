@@ -56,8 +56,15 @@
  *     nickname first (one extra Data API call, needs FACEIT_KEY).
  *   - Requires secret FACEIT_KEY. /maxelo additionally requires secret FA_KEY
  *     (Settings -> Variables and Secrets).
+ *   - Successful data responses are edge-cached per route (see CACHE_TTL) to
+ *     spare the upstream APIs / rate limits. Cache is per-colo; errors are not
+ *     cached. Expect data to lag by up to the route's TTL.
  */
 const DEFAULT_HOURS = 12;
+
+// Edge-cache TTL per route (seconds). Spares the upstream APIs / rate limits.
+// Cache is per-colo; errors are never cached (they set Cache-Control: no-store).
+const CACHE_TTL = { "/elo": 60, "/maxelo": 300, "/playerid": 86400 };
 
 // FACEIT player_id is a UUID; nicknames never match this shape.
 const PLAYER_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -141,7 +148,7 @@ async function handleElo(url, env, err) {
 // { error }. Faceit Analyser keys on nickname, so a player_id is resolved to a
 // nickname via the Data API first.
 async function handlePeak(url, env) {
-  const jErr = (message) => Response.json({ error: message });
+  const jErr = (message) => Response.json({ error: message }, { headers: { "Cache-Control": "no-store" } });
 
   let nick = resolveNick(url);
   if (!nick) return jErr("No nickname provided and no default set");
@@ -267,9 +274,9 @@ Bare <code>!elo</code> shows your stats; <code>!elo someone</code> looks up anot
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    const err = (message) => Response.json({ error: message });
+    const err = (message) => Response.json({ error: message }, { headers: { "Cache-Control": "no-store" } });
 
     // Read-only API: only GET (and HEAD, which the runtime derives from GET).
     if (request.method !== "GET" && request.method !== "HEAD") {
@@ -284,6 +291,14 @@ export default {
     // No favicon to serve; answer 204 so browsers stop asking (no 404 noise).
     if (path === "/favicon.ico") return new Response(null, { status: 204 });
 
+    // Serve a fresh copy from the edge cache when we have one.
+    const ttl = CACHE_TTL[path];
+    const cache = caches.default;
+    if (ttl) {
+      const hit = await cache.match(request);
+      if (hit) return hit;
+    }
+
     try {
       let res;
       if (path === "") res = handleHome(url);
@@ -294,6 +309,12 @@ export default {
 
       // Allow browser-side use (StreamElements widgets, OBS browser source, overlays).
       res.headers.set("Access-Control-Allow-Origin", "*");
+
+      // Cache successful data responses; errors opt out via Cache-Control: no-store.
+      if (ttl && res.headers.get("Cache-Control") !== "no-store") {
+        res.headers.set("Cache-Control", `public, max-age=${ttl}`);
+        ctx.waitUntil(cache.put(request, res.clone()));
+      }
       return res;
     } catch (e) {
       // Keep the "always JSON" contract even on unexpected failures
