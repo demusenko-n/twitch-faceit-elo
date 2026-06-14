@@ -71,9 +71,13 @@ const PLAYER_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 const isPlayerId = (s) => PLAYER_ID_RE.test(s);
 
 // Resolve player token: exactly one query token, else `default`. null if neither.
+// Strips invisible/zero-width chars first: Twitch appends one (e.g. U+034F) to
+// duplicate messages to bypass its anti-spam filter, which would otherwise be
+// treated as a (bogus) nickname on a repeated `!elo`.
 function resolveNick(url) {
-  const tokens = (url.searchParams.get("query") || "").trim().split(/\s+/).filter(Boolean);
-  const fallback = (url.searchParams.get("default") || "").trim();
+  const clean = (s) => (s || "").replace(/\p{Default_Ignorable_Code_Point}/gu, "").trim();
+  const tokens = clean(url.searchParams.get("query")).split(/\s+/).filter(Boolean);
+  const fallback = clean(url.searchParams.get("default"));
   return (tokens.length === 1 ? tokens[0] : fallback) || null;
 }
 
