@@ -271,6 +271,14 @@ export default {
     const url = new URL(request.url);
     const err = (message) => Response.json({ error: message });
 
+    // Read-only API: only GET (and HEAD, which the runtime derives from GET).
+    if (request.method !== "GET" && request.method !== "HEAD") {
+      return Response.json(
+        { error: "Method not allowed. Use GET." },
+        { status: 405, headers: { "Allow": "GET", "Access-Control-Allow-Origin": "*" } }
+      );
+    }
+
     const path = url.pathname.replace(/\/+$/, ""); // strip trailing slash ("/" -> "")
 
     try {
