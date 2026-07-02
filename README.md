@@ -57,7 +57,7 @@ Response: `{ "nickname": "...", "player_id": "..." }`
 npm install
 npx wrangler secret put FACEIT_KEY   # FACEIT Data API key
 npx wrangler secret put FA_KEY       # Faceit Analyser API key (only needed for /maxelo)
-wrangler deploy
+npx wrangler deploy
 ```
 
 For local development, copy the secrets template and fill it in. [`.dev.vars`](https://developers.cloudflare.com/workers/configuration/secrets/#local-development-with-secrets) is git-ignored:
