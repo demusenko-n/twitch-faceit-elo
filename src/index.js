@@ -154,12 +154,15 @@ async function handleElo(url, env, err) {
         const start = Date.now() - hours * 3600_000;
         const recent = matches.filter(m => m.date >= start);
 
-        out.window.win = recent.filter(m => m.i10 === "1").length;
-        out.window.lose = recent.length - out.window.win;
-
-        // Combined K/D over the window: total kills (i6) / total deaths (i8).
-        const kills = recent.reduce((s, m) => s + (Number(m.i6) || 0), 0);
-        const deaths = recent.reduce((s, m) => s + (Number(m.i8) || 0), 0);
+        // One pass over the window matches: wins, and total kills (i6) / deaths (i8).
+        let win = 0, kills = 0, deaths = 0;
+        for (const m of recent) {
+          if (m.i10 === "1") win++;
+          kills += Number(m.i6) || 0;
+          deaths += Number(m.i8) || 0;
+        }
+        out.window.win = win;
+        out.window.lose = recent.length - win;
         out.window.kd = deaths ? Math.round((kills / deaths) * 100) / 100 : 0;
 
         if (recent.length) {
