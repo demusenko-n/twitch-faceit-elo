@@ -30,8 +30,9 @@
  *                      other games return elo/level with window.* zeroed.
  *
  * /elo success:
- *   { nickname, elo, level, window: { hours, elo, win, lose, eloStr } }
+ *   { nickname, elo, level, window: { hours, elo, win, lose, eloStr, kd } }
  *   window.hours is the window actually used, or 0 if it could not be computed.
+ *   window.kd is combined kills/deaths over the window matches (0 if none).
  *
  * /maxelo: uses the shared query/default params (nickname or player_id).
  *
@@ -137,7 +138,7 @@ async function handleElo(url, env, err) {
     nickname: p.nickname,
     elo: g.faceit_elo,
     level: g.skill_level,
-    window: { hours: 0, elo: 0, win: 0, lose: 0, eloStr: "0" },
+    window: { hours: 0, elo: 0, win: 0, lose: 0, eloStr: "0", kd: 0 },
   };
 
   // Rolling-window stats from undocumented endpoint; best-effort.
@@ -155,6 +156,11 @@ async function handleElo(url, env, err) {
 
         out.window.win = recent.filter(m => m.i10 === "1").length;
         out.window.lose = recent.length - out.window.win;
+
+        // Combined K/D over the window: total kills (i6) / total deaths (i8).
+        const kills = recent.reduce((s, m) => s + (Number(m.i6) || 0), 0);
+        const deaths = recent.reduce((s, m) => s + (Number(m.i8) || 0), 0);
+        out.window.kd = deaths ? Math.round((kills / deaths) * 100) / 100 : 0;
 
         if (recent.length) {
           // baseline = elo after the last match BEFORE the window

@@ -22,9 +22,9 @@ Every player-taking route accepts **either a FACEIT nickname or a player_id** (t
 Response:
 ```json
 { "nickname": "...", "elo": 2450, "level": 9,
-  "window": { "hours": 12, "elo": 37, "win": 4, "lose": 2, "eloStr": "+37" } }
+  "window": { "hours": 12, "elo": 37, "win": 4, "lose": 2, "eloStr": "+37", "kd": 1.08 } }
 ```
-`window.hours` is the window actually used, or `0` if the (undocumented) stats endpoint could not be reached.
+`window.hours` is the window actually used, or `0` if the (undocumented) stats endpoint could not be reached. `window.kd` is the combined kills/deaths across the window's matches.
 
 ### `/maxelo` — all-time highest elo (via Faceit Analyser)
 
@@ -55,8 +55,8 @@ Response: `{ "nickname": "...", "player_id": "..." }`
 
 ```sh
 npm install
-wrangler secret put FACEIT_KEY   # FACEIT Data API key
-wrangler secret put FA_KEY       # Faceit Analyser API key (only needed for /maxelo)
+npx wrangler secret put FACEIT_KEY   # FACEIT Data API key
+npx wrangler secret put FA_KEY       # Faceit Analyser API key (only needed for /maxelo)
 wrangler deploy
 ```
 
@@ -74,7 +74,7 @@ Endpoints return JSON, so parse it with `$(urlfetch json ...)` + `$(eval)`. Repl
 
 Nightbot:
 ```
-!addcom !elo $(eval const a = $(urlfetch json https://<your-worker>.workers.dev/elo?query=$(querystring)&default=<nickname>&h=12); a.error ? a.error : a.nickname + ' • ELO: ' + a.elo + ' • LVL: ' + a.level + ' • ' + a.window.hours + 'h: ' + a.window.eloStr + ' [' + a.window.win + 'W/' + a.window.lose + 'L]')
+!addcom !elo $(eval const a = $(urlfetch json https://<your-worker>.workers.dev/elo?query=$(querystring)&default=<nickname>&h=12); a.error ? a.error : a.nickname + ' • ELO: ' + a.elo + ' • LVL: ' + a.level + ' • ' + a.window.hours + 'h: ' + a.window.eloStr + ' [' + a.window.win + 'W/' + a.window.lose + 'L] • K/D ' + a.window.kd)
 !addcom !maxelo $(eval const a = $(urlfetch json https://<your-worker>.workers.dev/maxelo?query=$(querystring)&default=<nickname>); a.error ? a.error : a.nickname + ' • Peak ELO: ' + a.maxelo)
 ```
 
