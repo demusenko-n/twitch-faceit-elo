@@ -264,7 +264,7 @@ function handleHome(url) {
     <tr><th>h</th><td>window in hours, 1–168 (default 12)</td></tr>
     <tr><th>game</th><td>FACEIT game id (default cs2)</td></tr>
   </table>
-  <p>Example: <a href="${b}/elo?query=redins1de">/elo?query=redins1de</a></p>
+  <p>Example: <a href="${b}/elo?query=redinside">/elo?query=redinside</a></p>
 </div>
 
 <div class="ep">
@@ -275,7 +275,7 @@ function handleHome(url) {
     <tr><th>default</th><td>fallback player for argument-less calls</td></tr>
     <tr><th>game</th><td>game id (default cs2): cs2, csgo, dota2, ow2, deadlock</td></tr>
   </table>
-  <p>Example: <a href="${b}/maxelo?query=redins1de">/maxelo?query=redins1de</a></p>
+  <p>Example: <a href="${b}/maxelo?query=redinside">/maxelo?query=redinside</a></p>
 </div>
 
 <div class="ep">
@@ -285,7 +285,7 @@ function handleHome(url) {
     <tr><th>query</th><td>nickname (single token); falls back to <code>default</code></td></tr>
     <tr><th>default</th><td>fallback player for argument-less calls</td></tr>
   </table>
-  <p>Example: <a href="${b}/playerid?query=redins1de">/playerid?query=redins1de</a></p>
+  <p>Example: <a href="${b}/playerid?query=redinside">/playerid?query=redinside</a></p>
 </div>
 
 <h2>Nightbot — ready-to-use commands</h2>
