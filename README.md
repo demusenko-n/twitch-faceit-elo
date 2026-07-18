@@ -14,9 +14,18 @@ Every player-taking route accepts **either a FACEIT nickname or a player_id** (t
 
 | Param     | Required | Default | Description |
 |-----------|----------|---------|-------------|
-| `query`   | no       | —       | Raw command args. Exactly one token is used as the player (nickname or player_id); empty or 2+ tokens fall back to `default`. Case-sensitive. |
+| `query`   | no       | —       | Raw command args. Exactly one token is used as the player (nickname or player_id); empty or 2+ tokens fall back to `default`. Case-sensitive. Supports an inline window — see below. |
 | `default` | no       | —       | Fallback player when `query` has no usable token (e.g. the streamer's nick for argument-less calls). |
-| `h`       | no       | `12`    | Rolling window in hours for elo +/- and W/L. Clamped to `[1, 168]`. |
+| `h`       | no       | `12`    | Rolling window in hours for elo +/- and W/L. Clamped to `[1, 168]`. An inline `nick:h` in `query` takes precedence. |
+
+The `query` token may carry an inline hours override, `<nick>:<h>`. Inline parts win over the `default` / `h` params; empty parts fall back to them:
+
+| `query` | Resolves to |
+|---------|-------------|
+| `nick:24` | nick, 24h |
+| `nick` or `nick:` | nick, `h` param (or 12) |
+| `:24` | `default` nick, 24h |
+| `:` or empty | `default` nick, `h` param (or 12) |
 | `game`    | no       | `cs2`   | FACEIT game id. Window stats are computed only for `cs2`; other games return elo/level with the window zeroed. |
 
 Response:

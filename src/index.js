@@ -19,12 +19,17 @@
  *   query   (optional) Raw command args. Exactly one token is used as the
  *                      player (nickname or player_id). Case-sensitive. Empty or
  *                      2+ tokens -> fall back to `default`.
+ *                      The token may carry an inline hours override for /elo,
+ *                      "<nick>:<h>" — e.g. "nick:24", ":24" (default nick, 24h),
+ *                      "nick:" / "nick" (nick, `h` param). Inline parts win over
+ *                      the `default` / `h` params; empty parts fall back to them.
  *   default (optional) Fallback player when `query` has no usable token
  *                      (e.g. streamer's nick for argument-less command calls).
  *
  * /elo extra params:
  *   h       (optional) Rolling window in hours for elo +/- and W/L.
- *                      Default 12, clamped to [1, 168].
+ *                      Default 12, clamped to [1, 168]. An inline "<nick>:<h>"
+ *                      in `query` takes precedence over this param.
  *   game    (optional) FACEIT game id (e.g. "cs2", "csgo"). Default "cs2".
  *                      Rolling-window stats (window.*) only computed for cs2;
  *                      other games return elo/level with window.* zeroed.
@@ -71,26 +76,39 @@ const CACHE_TTL = { "/elo": 30, "/maxelo": 3600, "/playerid": 600 };
 const PLAYER_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isPlayerId = (s) => PLAYER_ID_RE.test(s);
 
-// Resolve player token: exactly one query token, else `default`. null if neither.
-// Strips invisible/zero-width chars first: Twitch appends one (e.g. U+034F) to
-// duplicate messages to bypass its anti-spam filter, which would otherwise be
-// treated as a (bogus) nickname on a repeated `!elo`.
-function resolveNick(url) {
-  // Strip invisible chars; also drop a leading "@" (chat mentions like @nick).
+// explicit hours clamp to [1,168] (0 / -5 -> 1); blank/missing -> default.
+const clampHours = (v) => Math.min(168, Math.max(1, Number(v) || 1));
+
+// Parse the player token and the effective window from `query`.
+//
+// The single query token may carry an inline hours override, "<nick>:<h>":
+//   "nick:24" -> nick + 24h      ":24"  -> `default` nick + 24h
+//   "nick" / "nick:" -> nick + `h` param (or DEFAULT_HOURS)
+// Inline parts win over the `default` / `h` params; empty parts fall back to them.
+//
+// Invisible/zero-width chars are stripped first (Twitch appends one, e.g. U+034F,
+// to duplicate messages to bypass its anti-spam filter, which would otherwise be
+// treated as a bogus nickname), as is a leading "@" from chat mentions.
+// Shared by the handlers and the cache key, so the canonical key matches the
+// values handlers actually use.
+function parseTarget(url) {
   const clean = (s) => (s || "").replace(/\p{Default_Ignorable_Code_Point}/gu, "").trim();
   const deAt = (s) => s.replace(/^@+/, "");
+
   const tokens = clean(url.searchParams.get("query")).split(/\s+/).map(deAt).filter(Boolean);
-  const fallback = deAt(clean(url.searchParams.get("default")));
-  return (tokens.length === 1 ? tokens[0] : fallback) || null;
+  const token = tokens.length === 1 ? tokens[0] : "";
+
+  const sep = token.indexOf(":");
+  const inlineNick = sep === -1 ? token : token.slice(0, sep);
+  const inlineHours = sep === -1 ? "" : token.slice(sep + 1).trim();
+
+  const hParam = url.searchParams.get("h");
+  return {
+    nick: (inlineNick || deAt(clean(url.searchParams.get("default")))) || null,
+    hours: inlineHours ? clampHours(inlineHours) : (hParam ? clampHours(hParam) : DEFAULT_HOURS),
+  };
 }
 
-// Param normalization shared by handlers and the cache key, so the canonical
-// key matches the values handlers actually use.
-// explicit h clamps to [1,168] (h=0 / h=-5 -> 1); missing/blank -> default.
-function parseHours(url) {
-  const hRaw = url.searchParams.get("h");
-  return hRaw ? Math.min(168, Math.max(1, Number(hRaw) || 1)) : DEFAULT_HOURS;
-}
 function parseGame(url) {
   return (url.searchParams.get("game") || "cs2").trim().toLowerCase() || "cs2";
 }
@@ -100,9 +118,9 @@ function parseGame(url) {
 // (when both resolve to `a`) hit the same cache entry. Used for match AND put.
 function cacheKey(url, path) {
   const p = new URLSearchParams();
-  const nick = resolveNick(url);
+  const { nick, hours } = parseTarget(url);
   if (nick) p.set("n", nick);                 // nick is case-sensitive: not lowercased
-  if (path === "/elo") p.set("h", String(parseHours(url)));
+  if (path === "/elo") p.set("h", String(hours));
   if (path === "/elo" || path === "/maxelo") p.set("game", parseGame(url));
   p.sort();
   return new Request(`${url.origin}${path}?${p}`);
@@ -122,10 +140,9 @@ async function lookupPlayer(id, env, err) {
 
 // ---- /elo : current elo/level + rolling-window stats ----------------------
 async function handleElo(url, env, err) {
-  const nick = resolveNick(url);
+  const { nick, hours } = parseTarget(url);
   if (!nick) return err("No nickname provided and no default set");
 
-  const hours = parseHours(url);
   const game = parseGame(url);
 
   const { player: p, error } = await lookupPlayer(nick, env, err);
@@ -185,7 +202,7 @@ async function handleElo(url, env, err) {
 // { error }. Faceit Analyser keys on nickname, so a player_id is resolved to a
 // nickname via the Data API first.
 async function handlePeak(url, env, err) {
-  let nick = resolveNick(url);
+  let { nick } = parseTarget(url);
   if (!nick) return err("No nickname provided and no default set");
   if (!env.FA_KEY) return err("Peak lookup not configured (missing FA_KEY)");
 
@@ -215,7 +232,7 @@ async function handlePeak(url, env, err) {
 
 // ---- /playerid : resolve nickname (or player_id) to the stable player_id ---
 async function handlePlayerId(url, env, err) {
-  const id = resolveNick(url);
+  const { nick: id } = parseTarget(url);
   if (!id) return err("No nickname provided and no default set");
 
   const { player: p, error } = await lookupPlayer(id, env, err);
@@ -259,12 +276,14 @@ function handleHome(url) {
   <h2>GET /elo</h2>
   <p>Current elo/level + rolling-window stats.</p>
   <table>
-    <tr><th>query</th><td>nickname or player_id (single token); falls back to <code>default</code></td></tr>
+    <tr><th>query</th><td>nickname or player_id (single token); falls back to <code>default</code>.
+      Inline window supported: <code>nick:24</code>, <code>:24</code>, <code>nick:</code></td></tr>
     <tr><th>default</th><td>fallback player for argument-less calls</td></tr>
-    <tr><th>h</th><td>window in hours, 1–168 (default 12)</td></tr>
+    <tr><th>h</th><td>window in hours, 1–168 (default 12); an inline <code>nick:h</code> wins</td></tr>
     <tr><th>game</th><td>FACEIT game id (default cs2)</td></tr>
   </table>
-  <p>Example: <a href="${b}/elo?query=redinside">/elo?query=redinside</a></p>
+  <p>Example: <a href="${b}/elo?query=redinside">/elo?query=redinside</a>
+    <span class="sep">·</span> <a href="${b}/elo?query=redinside:24">/elo?query=redinside:24</a></p>
 </div>
 
 <div class="ep">
