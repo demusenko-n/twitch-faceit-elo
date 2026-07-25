@@ -28,7 +28,7 @@
  *
  * /elo extra params:
  *   h       (optional) Rolling window in hours for elo +/- and W/L.
- *                      Default 12, clamped to [1, 168]. An inline "<nick>:<h>"
+ *                      Default 12, clamped to [1, 720]. An inline "<nick>:<h>"
  *                      in `query` takes precedence over this param.
  *   game    (optional) FACEIT game id (e.g. "cs2", "csgo"). Default "cs2".
  *                      Rolling-window stats (window.*) only computed for cs2;
@@ -76,8 +76,8 @@ const CACHE_TTL = { "/elo": 30, "/maxelo": 3600, "/playerid": 600 };
 const PLAYER_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isPlayerId = (s) => PLAYER_ID_RE.test(s);
 
-// explicit hours clamp to [1,168] (0 / -5 -> 1); blank/missing -> default.
-const clampHours = (v) => Math.min(168, Math.max(1, Number(v) || 1));
+// explicit hours clamp to [1,720] (0 / -5 -> 1); blank/missing -> default.
+const clampHours = (v) => Math.min(720, Math.max(1, Number(v) || 1));
 
 // Parse the player token and the effective window from `query`.
 //
@@ -279,7 +279,7 @@ function handleHome(url) {
     <tr><th>query</th><td>nickname or player_id (single token); falls back to <code>default</code>.
       Inline window supported: <code>nick:24</code>, <code>:24</code>, <code>nick:</code></td></tr>
     <tr><th>default</th><td>fallback player for argument-less calls</td></tr>
-    <tr><th>h</th><td>window in hours, 1–168 (default 12); an inline <code>nick:h</code> wins</td></tr>
+    <tr><th>h</th><td>window in hours, 1–720 (default 12); an inline <code>nick:h</code> wins</td></tr>
     <tr><th>game</th><td>FACEIT game id (default cs2)</td></tr>
   </table>
   <p>Example: <a href="${b}/elo?query=redinside">/elo?query=redinside</a>

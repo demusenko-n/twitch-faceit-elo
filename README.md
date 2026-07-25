@@ -16,7 +16,7 @@ Every player-taking route accepts **either a FACEIT nickname or a player_id** (t
 |-----------|----------|---------|-------------|
 | `query`   | no       | —       | Raw command args. Exactly one token is used as the player (nickname or player_id); empty or 2+ tokens fall back to `default`. Case-sensitive. Supports an inline window — see below. |
 | `default` | no       | —       | Fallback player when `query` has no usable token (e.g. the streamer's nick for argument-less calls). |
-| `h`       | no       | `12`    | Rolling window in hours for elo +/- and W/L. Clamped to `[1, 168]`. An inline `nick:h` in `query` takes precedence. |
+| `h`       | no       | `12`    | Rolling window in hours for elo +/- and W/L. Clamped to `[1, 720]`. An inline `nick:h` in `query` takes precedence. |
 
 The `query` token may carry an inline hours override, `<nick>:<h>`. Inline parts win over the `default` / `h` params; empty parts fall back to them:
 
