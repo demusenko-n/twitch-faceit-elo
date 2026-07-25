@@ -33,7 +33,7 @@ Response:
 { "nickname": "...", "elo": 2450, "level": 9,
   "window": { "hours": 12, "elo": 37, "win": 4, "lose": 2, "eloStr": "+37", "kd": 1.08 } }
 ```
-`window.hours` is the window actually used, or `0` if the (undocumented) stats endpoint could not be reached. `window.kd` is the combined kills/deaths across the window's matches.
+`window.hours` is the window actually **covered**, or `0` if the (undocumented) stats endpoint could not be reached. It can be smaller than the requested `h`: match history is paged in 100 at a time and capped at 5 pages, so a very wide window on a very active account may be truncated — in that case `window.hours` reports the real span instead of the requested one. `window.kd` is the combined kills/deaths across the window's matches.
 
 ### `/maxelo` — all-time highest elo (via Faceit Analyser)
 
@@ -91,7 +91,7 @@ Argument-less calls (`!elo`) resolve to `<nickname>`; `!elo someplayer` looks up
 
 ## Notes / caveats
 
-- The `/elo` rolling-window stats (`window.*`) come from an **undocumented** FACEIT endpoint. If it breaks, elo/level still return and the window degrades to zeros (`window.hours` becomes `0`).
+- The `/elo` rolling-window stats (`window.*`) come from an **undocumented** FACEIT endpoint. If it breaks, elo/level still return and the window degrades to zeros (`window.hours` becomes `0`). It serves at most 100 matches per page (a larger `size` is ignored), so wide windows are paged in — up to 5 pages, which bounds the response time.
 - `/maxelo` depends on [Faceit Analyser](https://faceitanalyser.com/) (`highest_elo` field). History may be incomplete for rarely-tracked players, and the free tier is limited to ~5000 requests/month.
 - Successful responses are edge-cached (`/elo` 30s, `/maxelo` 1h, `/playerid` 10m) to spare the upstream APIs. The cache is per-datacenter and errors are never cached, so data can lag by up to the route's TTL.
 

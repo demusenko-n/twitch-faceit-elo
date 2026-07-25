@@ -36,7 +36,9 @@
  *
  * /elo success:
  *   { nickname, elo, level, window: { hours, elo, win, lose, eloStr, kd } }
- *   window.hours is the window actually used, or 0 if it could not be computed.
+ *   window.hours is the window actually covered, or 0 if it could not be computed.
+ *   It is less than the requested `h` when the match history hit the page cap
+ *   (see PAGE_SIZE/MAX_PAGES) before reaching the start of the window.
  *   window.kd is combined kills/deaths over the window matches (0 if none).
  *
  * /maxelo: uses the shared query/default params (nickname or player_id).
@@ -55,7 +57,9 @@
  *
  * Notes:
  *   - /elo window stats come from an UNDOCUMENTED FACEIT endpoint; if it
- *     breaks, elo/level still return and window.* degrade to zeros.
+ *     breaks, elo/level still return and window.* degrade to zeros. It serves at
+ *     most 100 matches per page, so wide windows are paged in (up to MAX_PAGES);
+ *     beyond that the window is truncated and window.hours reports the real span.
  *   - /maxelo uses Faceit Analyser (highest_elo field); its history may be
  *     incomplete for rarely-tracked players. Free tier: 5000 req/month.
  *     Faceit Analyser keys on nickname, so a player_id is resolved to a
@@ -67,6 +71,12 @@
  *     cached. Expect data to lag by up to the route's TTL.
  */
 const DEFAULT_HOURS = 12;
+
+// Match history paging. The stats endpoint hard-caps a page at 100 (a larger
+// `size` is ignored), so long windows need several pages; MAX_PAGES bounds the
+// latency (Nightbot's urlfetch gives up after a few seconds).
+const PAGE_SIZE = 100;
+const MAX_PAGES = 5;
 
 // Edge-cache TTL per route (seconds). Spares the upstream APIs / rate limits.
 // Cache is per-colo; errors are never cached (they set Cache-Control: no-store).
@@ -138,6 +148,31 @@ async function lookupPlayer(id, env, err) {
   return { player: await pr.json() };
 }
 
+// Match history from the undocumented stats endpoint, newest first.
+// The endpoint caps a page at 100 regardless of `size`, so walk pages until one
+// match predates the window (that match is the elo baseline), history runs out,
+// or MAX_PAGES is hit. Small windows stay a single request.
+// Returns null only if the very first page failed; a later failure yields
+// whatever was collected so far.
+async function fetchMatches(playerId, start) {
+  const matches = [];
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const r = await fetch(
+      `https://api.faceit.com/stats/v1/stats/time/users/${playerId}/games/cs2?page=${page}&size=${PAGE_SIZE}`,
+      { headers: { "User-Agent": "Mozilla/5.0" } }
+    );
+    if (!r.ok) return page === 0 ? null : matches;
+
+    const batch = await r.json();
+    if (!Array.isArray(batch) || !batch.length) break;
+    matches.push(...batch);
+
+    if (batch.length < PAGE_SIZE) break;                       // end of history
+    if (matches[matches.length - 1].date < start) break;       // window covered
+  }
+  return matches;
+}
+
 // ---- /elo : current elo/level + rolling-window stats ----------------------
 async function handleElo(url, env, err) {
   const { nick, hours } = parseTarget(url);
@@ -162,13 +197,11 @@ async function handleElo(url, env, err) {
   // window.hours stays 0 unless the window was actually computed.
   if (game === "cs2") {
     try {
-      const sr = await fetch(
-        `https://api.faceit.com/stats/v1/stats/time/users/${p.player_id}/games/cs2?page=0&size=100`,
-        { headers: { "User-Agent": "Mozilla/5.0" } }
-      );
-      if (sr.ok) {
-        const matches = await sr.json();          // newest first
-        const start = Date.now() - hours * 3600_000;
+      const now = Date.now();
+      const start = now - hours * 3600_000;
+      const matches = await fetchMatches(p.player_id, start);   // newest first
+
+      if (matches?.length) {
         const recent = matches.filter(m => m.date >= start);
 
         // One pass over the window matches: wins, and total kills (i6) / deaths (i8).
@@ -189,7 +222,14 @@ async function handleElo(url, env, err) {
           if (baseline) out.window.elo = out.elo - Number(baseline);
         }
         out.window.eloStr = out.window.elo > 0 ? `+${out.window.elo}` : String(out.window.elo);
-        out.window.hours = hours;
+
+        // Every loaded match sits inside the window AND the page cap stopped us:
+        // the data is truncated, so report the span actually covered. (Running out
+        // of history is not truncation — those are all the matches there are.)
+        const truncated = recent.length === matches.length && matches.length >= PAGE_SIZE * MAX_PAGES;
+        out.window.hours = truncated
+          ? Math.max(1, Math.round((now - matches[matches.length - 1].date) / 3600_000))
+          : hours;
       }
     } catch (e) { /* leave window.* zeroed (hours stays 0) */ }
   }
