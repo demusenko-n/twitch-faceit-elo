@@ -307,6 +307,7 @@ function handleHome(url) {
   footer a:hover { text-decoration: underline; }
   footer svg { width: 14px; height: 14px; vertical-align: -2px; margin-right: 3px; }
   .sep { opacity: .4; margin: 0 .5rem; }
+  .credit { margin-top: .35rem; opacity: .8; }
 </style>
 <h1>faceit-elo-bot</h1>
 <p class="sub">FACEIT CS2 elo / peak elo as JSON endpoints for Twitch chat bots.</p>
@@ -365,6 +366,7 @@ Errors are never cached. The <code>X-Cache</code> response header shows <code>HI
   <a href="https://www.twitch.tv/redins1de"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/></svg>twitch.tv/redins1de</a>
   <span class="sep">·</span>
   <a href="https://t.me/redinside"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.139-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>t.me/redinside</a>
+  <div class="credit"><a href="https://faceitanalyser.com">Powered by Faceit Analyser</a></div>
 </footer>
 </html>`;
   return new Response(html, {
