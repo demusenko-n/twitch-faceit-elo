@@ -6,7 +6,9 @@ Cloudflare Worker exposing FACEIT CS2 elo / peak elo as JSON endpoints for Twitc
 
 All data routes are `GET` and respond with JSON.
 
-`GET /` returns a small HTML guide page (usage overview); the data routes are below.
+`GET /` returns a small HTML guide page (usage overview). It is a static asset
+([`public/index.html`](public/index.html)) uploaded by `wrangler deploy` and served
+before the Worker runs, so it never executes any code. The data routes are below.
 
 Every player-taking route accepts **either a FACEIT nickname or a player_id** (the stable UUID that never changes). Inputs matching the UUID shape are treated as a player_id; everything else as a nickname.
 

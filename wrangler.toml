@@ -8,6 +8,12 @@ routes = [
   { pattern = "faceit.redins1de.xyz", custom_domain = true }
 ]
 
+# The guide page at / is a static file (public/index.html), not Worker code.
+# Assets are matched BEFORE the Worker runs, so / never reaches src/index.js.
+# The data routes match no file and fall through to the Worker as before.
+[assets]
+directory = "public"
+
 # Workers logs / metrics (viewable in the Cloudflare dashboard).
 [observability]
 enabled = true

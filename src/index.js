@@ -4,7 +4,8 @@
  * Author: redins1de — https://www.twitch.tv/redins1de | https://t.me/redinside
  *
  * Routes (GET):
- *   /                   HTML guide page (usage overview).
+ *   /                   HTML guide page. Served as a static asset from
+ *                       public/index.html; never reaches this Worker.
  *   /elo                Current elo/level + rolling-window stats.
  *   /maxelo             All-time highest elo (via Faceit Analyser API).
  *   /playerid           Resolve a nickname to its stable FACEIT player_id.
@@ -296,99 +297,6 @@ async function handlePlayerId(url, env, err) {
   return Response.json({ nickname: p.nickname, player_id: p.player_id });
 }
 
-// ---- / : human-readable guide page ----------------------------------------
-function handleHome(url) {
-  const b = url.origin;
-  const html = `<!doctype html>
-<html lang="en">
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>faceit-elo-bot</title>
-<style>
-  :root { color-scheme: light dark; }
-  body { font: 15px/1.6 system-ui, sans-serif; max-width: 680px; margin: 2rem auto; padding: 0 1rem; }
-  h1 { margin-bottom: .2rem; }
-  p.sub { margin-top: 0; opacity: .7; }
-  code { background: rgba(127,127,127,.18); padding: .1em .35em; border-radius: 4px; }
-  .ep { margin: 1.4rem 0; padding-left: 1rem; border-left: 3px solid rgba(127,127,127,.35); }
-  .ep h2 { margin: 0 0 .3rem; font-size: 1.05rem; }
-  table { border-collapse: collapse; margin: .4rem 0; font-size: .92em; }
-  td, th { text-align: left; padding: .15rem .8rem .15rem 0; vertical-align: top; }
-  a { color: inherit; }
-  pre { background: rgba(127,127,127,.14); padding: .7rem .8rem; border-radius: 6px; white-space: pre-wrap; word-break: break-all; font-size: .82em; }
-  pre code { background: none; padding: 0; }
-  footer { margin-top: 2rem; opacity: .75; font-size: .85em; }
-  footer a { text-decoration: none; white-space: nowrap; }
-  footer a:hover { text-decoration: underline; }
-  footer svg { width: 14px; height: 14px; vertical-align: -2px; margin-right: 3px; }
-  .sep { opacity: .4; margin: 0 .5rem; }
-  .credit { margin-top: .35rem; opacity: .8; }
-</style>
-<h1>faceit-elo-bot</h1>
-<p class="sub">FACEIT CS2 elo / peak elo as JSON endpoints for Twitch chat bots.</p>
-<p>All routes respond with JSON. Every route accepts a FACEIT <strong>nickname</strong> or a <strong>player_id</strong> (the stable UUID that never changes).</p>
-
-<div class="ep">
-  <h2>GET /elo</h2>
-  <p>Current elo/level + rolling-window stats.</p>
-  <table>
-    <tr><th>query</th><td>nickname or player_id (single token); falls back to <code>default</code>.
-      Inline window supported: <code>nick:24</code>, <code>:24</code>, <code>nick:</code></td></tr>
-    <tr><th>default</th><td>fallback player for argument-less calls</td></tr>
-    <tr><th>h</th><td>window in hours, 1–720 (default 12); an inline <code>nick:h</code> wins</td></tr>
-    <tr><th>game</th><td>FACEIT game id (default cs2)</td></tr>
-  </table>
-  <p>Example: <a href="${b}/elo?query=redinside">/elo?query=redinside</a>
-    <span class="sep">·</span> <a href="${b}/elo?query=redinside:24">/elo?query=redinside:24</a></p>
-</div>
-
-<div class="ep">
-  <h2>GET /maxelo</h2>
-  <p>All-time highest elo (via Faceit Analyser).</p>
-  <table>
-    <tr><th>query</th><td>nickname or player_id (single token); falls back to <code>default</code></td></tr>
-    <tr><th>default</th><td>fallback player for argument-less calls</td></tr>
-    <tr><th>game</th><td>game id (default cs2): cs2, csgo, dota2, ow2, deadlock</td></tr>
-  </table>
-  <p>Example: <a href="${b}/maxelo?query=redinside">/maxelo?query=redinside</a></p>
-</div>
-
-<div class="ep">
-  <h2>GET /playerid</h2>
-  <p>Resolve a nickname to its stable FACEIT player_id.</p>
-  <table>
-    <tr><th>query</th><td>nickname (single token); falls back to <code>default</code></td></tr>
-    <tr><th>default</th><td>fallback player for argument-less calls</td></tr>
-  </table>
-  <p>Example: <a href="${b}/playerid?query=redinside">/playerid?query=redinside</a></p>
-</div>
-
-<h2>Nightbot — ready-to-use commands</h2>
-<p>Paste into chat, then replace <code>YOUR_NICK</code> with your FACEIT nickname.
-Bare <code>!elo</code> shows your stats; <code>!elo someone</code> looks up another player.</p>
-<p style="opacity:.7">Tip: drop your <code>player_id</code> in place of the nickname so the command survives a rename — grab it from <a href="${b}/playerid?query=YOUR_NICK">/playerid</a>.</p>
-<pre><code>!addcom !elo $(eval const a = $(urlfetch json ${b}/elo?query=$(querystring)&amp;default=YOUR_NICK&amp;h=12); a.error ? a.error : a.nickname + ' • ELO: ' + a.elo + ' • LVL: ' + a.level + ' • ' + a.window.hours + 'h: ' + a.window.eloStr + ' [' + a.window.win + 'W/' + a.window.lose + 'L]')</code></pre>
-<pre><code>!addcom !maxelo $(eval const a = $(urlfetch json ${b}/maxelo?query=$(querystring)&amp;default=YOUR_NICK); a.error ? a.error : a.nickname + ' • Peak ELO: ' + a.maxelo)</code></pre>
-
-<h2>Caching</h2>
-<p>Successful responses are cached at the edge to spare the upstream APIs:
-<code>/elo</code> 30s <span class="sep">·</span> <code>/maxelo</code> 1h <span class="sep">·</span> <code>/playerid</code> 10m.
-Errors are never cached. The <code>X-Cache</code> response header shows <code>HIT</code> or <code>MISS</code>.</p>
-
-<footer>
-  Made by <strong>redins1de</strong>
-  <span class="sep">·</span>
-  <a href="https://www.twitch.tv/redins1de"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/></svg>twitch.tv/redins1de</a>
-  <span class="sep">·</span>
-  <a href="https://t.me/redinside"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.139-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>t.me/redinside</a>
-  <div class="credit"><a href="https://faceitanalyser.com">Powered by Faceit Analyser</a></div>
-</footer>
-</html>`;
-  return new Response(html, {
-    headers: { "content-type": "text/html; charset=utf-8" },
-  });
-}
-
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -424,8 +332,7 @@ export default {
 
     try {
       let res;
-      if (path === "") res = handleHome(url);
-      else if (path === "/elo") res = await handleElo(url, env, err);
+      if (path === "/elo") res = await handleElo(url, env, err);
       else if (path === "/maxelo") res = await handlePeak(url, env, err);
       else if (path === "/playerid") res = await handlePlayerId(url, env, err);
       else res = Response.json({ error: "Not found. See / for usage." }, { status: 404 });
