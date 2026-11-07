@@ -36,7 +36,9 @@
  *
  * /elo success:
  *   { nickname, elo, level, window: { hours, elo, win, lose, eloStr, kd } }
- *   window.hours is the window actually covered, or 0 if it could not be computed.
+ *   window.hours is the window actually covered, or 0 if the stats endpoint
+ *   failed — such a response is sent no-store, so a transient failure is never
+ *   cached and the next call retries.
  *   It is less than the requested `h` when the match history hit the page cap
  *   (see PAGE_SIZE/MAX_PAGES) before reaching the start of the window.
  *   window.kd is combined kills/deaths over the window matches (0 if none).
@@ -67,8 +69,9 @@
  *   - Requires secret FACEIT_KEY. /maxelo additionally requires secret FA_KEY
  *     (Settings -> Variables and Secrets).
  *   - Successful data responses are edge-cached per route (see CACHE_TTL) to
- *     spare the upstream APIs / rate limits. Cache is per-colo; errors are not
- *     cached. Expect data to lag by up to the route's TTL.
+ *     spare the upstream APIs / rate limits. Cache is per-colo; errors and
+ *     /elo responses whose window collapsed are not cached. Expect data to lag
+ *     by up to the route's TTL.
  */
 const DEFAULT_HOURS = 12;
 
@@ -194,14 +197,19 @@ async function handleElo(url, env, err) {
   };
 
   // Rolling-window stats from undocumented endpoint; best-effort.
-  // window.hours stays 0 unless the window was actually computed.
+  // window.hours stays 0 only when the endpoint let us down (see windowFailed).
+  let windowFailed = false;
   if (game === "cs2") {
     try {
       const now = Date.now();
       const start = now - hours * 3600_000;
       const matches = await fetchMatches(p.player_id, start);   // newest first
 
-      if (matches?.length) {
+      if (matches === null) {
+        windowFailed = true;            // endpoint refused us: bot check, 5xx, etc.
+      } else if (!matches.length) {
+        out.window.hours = hours;       // no history at all: the window is valid, just empty
+      } else {
         const recent = matches.filter(m => m.date >= start);
 
         // One pass over the window matches: wins, and total kills (i6) / deaths (i8).
@@ -231,10 +239,17 @@ async function handleElo(url, env, err) {
           ? Math.max(1, Math.round((now - matches[matches.length - 1].date) / 3600_000))
           : hours;
       }
-    } catch (e) { /* leave window.* zeroed (hours stays 0) */ }
+    } catch (e) {
+      windowFailed = true;              // network error or malformed response
+    }
   }
 
-  return Response.json(out);
+  // Never cache a response whose window collapsed. The undocumented endpoint
+  // fails intermittently, and the 30s TTL would otherwise pin "0h: 0 [0W/0L]"
+  // in chat long after it recovered; this way the next call just retries.
+  return windowFailed
+    ? Response.json(out, { headers: { "Cache-Control": "no-store" } })
+    : Response.json(out);
 }
 
 // ---- /maxelo : all-time highest elo (Faceit Analyser) ---------------------
