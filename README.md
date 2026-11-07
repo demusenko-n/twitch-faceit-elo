@@ -97,6 +97,21 @@ Argument-less calls (`!elo`) resolve to `<nickname>`; `!elo someplayer` looks up
 - `/maxelo` depends on [Faceit Analyser](https://faceitanalyser.com/) (`highest_elo` field). History may be incomplete for rarely-tracked players, and the free tier is limited to ~5000 requests/month.
 - Successful responses are edge-cached (`/elo` 30s, `/maxelo` 1h, `/playerid` 10m) to spare the upstream APIs. The cache is per-datacenter, so data can lag by up to the route's TTL. Errors are never cached, and neither is an `/elo` response whose window collapsed (`window.hours: 0`) — otherwise one failed call would keep showing `0h: 0 [0W/0L]` for the whole TTL.
 
+## Versioning
+
+The version is shown in the footer of the guide page and returned by `GET /version`
+(also in the `X-Version` header of every response). It lives in one place —
+the `version` field of `package.json` — and is bumped with:
+
+| command | changes | when |
+| --- | --- | --- |
+| `npm run bump:fix` | third number (`1.0.007` -> `1.0.008`) | micro-fixes |
+| `npm run bump:feat` | second number (`1.0.231` -> `1.1.000`) | a new command, anything substantial |
+| `npm run bump:major` | first number (`1.1.004` -> `2.0.000`) | global changes (e.g. new documentation) |
+
+The stored value is plain semver (`1.0.8`), so npm's own tooling keeps working;
+the third number is zero-padded to three digits only for display.
+
 ## Author
 
 redins1de — [twitch.tv/redins1de](https://www.twitch.tv/redins1de) · [t.me/redinside](https://t.me/redinside)

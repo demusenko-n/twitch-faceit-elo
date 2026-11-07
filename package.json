@@ -6,7 +6,10 @@
   "author": "redins1de (https://www.twitch.tv/redins1de)",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "bump:fix": "npm version patch --no-git-tag-version",
+    "bump:feat": "npm version minor --no-git-tag-version",
+    "bump:major": "npm version major --no-git-tag-version"
   },
   "devDependencies": {
     "wrangler": "^4.158.0"

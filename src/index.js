@@ -9,6 +9,7 @@
  *   /elo                Current elo/level + rolling-window stats.
  *   /maxelo             All-time highest elo (via Faceit Analyser API).
  *   /playerid           Resolve a nickname to its stable FACEIT player_id.
+ *   /version            Version of the deployed Worker: { version }.
  *
  * Player identifier: every route that takes a player accepts EITHER a FACEIT
  * nickname OR a player_id (the stable UUID that never changes). Inputs matching
@@ -74,6 +75,23 @@
  *     /elo responses whose window collapsed are not cached. Expect data to lag
  *     by up to the route's TTL.
  */
+// Single source of truth for the version: the `version` field of package.json,
+// bumped with `npm run bump:fix` (micro-fix, third number), `bump:feat` (new
+// command / anything substantial, second number) or `bump:major` (global change,
+// e.g. documentation, first number). It is plain semver, so the npm tooling keeps
+// working; the third number is displayed zero-padded to three digits
+// (1.0.7 -> "1.0.007").
+//
+// Served at /version and in the X-Version header of every Worker response. The
+// guide page fetches /version for its footer: it is a static asset, so there is
+// no build step that could inline the number into the HTML.
+import pkg from "../package.json";
+
+const VERSION = (() => {
+  const [maj = "0", min = "0", patch = "0"] = String(pkg.version).split(".");
+  return `${maj}.${min}.${patch.padStart(3, "0")}`;
+})();
+
 const DEFAULT_HOURS = 12;
 
 // Match history paging. The stats endpoint hard-caps a page at 100 (a larger
@@ -335,10 +353,14 @@ export default {
       if (path === "/elo") res = await handleElo(url, env, err);
       else if (path === "/maxelo") res = await handlePeak(url, env, err);
       else if (path === "/playerid") res = await handlePlayerId(url, env, err);
+      else if (path === "/version") res = Response.json({ version: VERSION }, { headers: { "Cache-Control": "public, max-age=60" } });
       else res = Response.json({ error: "Not found. See / for usage." }, { status: 404 });
 
       // Allow browser-side use (StreamElements widgets, OBS browser source, overlays).
       res.headers.set("Access-Control-Allow-Origin", "*");
+
+      // Which build answered — handy when a stale edge cache is suspected.
+      res.headers.set("X-Version", VERSION);
 
       // Cache successful data responses; errors opt out via Cache-Control: no-store.
       if (key && res.headers.get("Cache-Control") !== "no-store") {
